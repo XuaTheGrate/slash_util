@@ -285,6 +285,7 @@ class Context(Generic[BotT, CogT]):
         - - A list of files to send with the message. Incompatible with ``file``.
         - ephemeral: ``bool``
         - - Whether the message should be ephemeral (only visible to the interaction user).
+        - - Note: This field is ignored if the interaction was deferred.
         - tts: ``bool``
         - - Whether the message should be played via Text To Speech. Send TTS Messages permission is required.
         - view: [``discord.ui.View``](https://discordpy.readthedocs.io/en/master/api.html#discord.ui.View)

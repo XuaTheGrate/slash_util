@@ -221,6 +221,7 @@ Parameters:
 - - A list of files to send with the message. Incompatible with ``file``.
 - ephemeral: ``bool``
 - - Whether the message should be ephemeral (only visible to the interaction user).
+- - Note: This field is ignored if the interaction was deferred.
 
 Returns
 - [``discord.InteractionMessage``](https://discordpy.readthedocs.io/en/master/api.html#discord.InteractionMessage) if this is the first time responding.

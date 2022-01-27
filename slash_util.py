@@ -144,6 +144,7 @@ class Range(metaclass=_RangeMeta):
         self.max = max
 
 class Bot(commands.Bot):
+    application_id: int  # hack to avoid linting errors on http methods
     async def start(self, token: str, *, reconnect: bool = True) -> None:
         await self.login(token)
         
@@ -182,17 +183,10 @@ class Bot(commands.Bot):
         - guild_id: ``Optional[str]``
         - - The guild ID to delete from, or ``None`` to delete global commands.
         """
-        path = f'/applications/{self.application_id}'
         if guild_id is not None:
-            path += f'/guilds/{guild_id}'
-        path += '/commands'
-
-        route = discord.http.Route("GET", path)
-        data = await self.http.request(route)
-
-        for cmd in data:
-            snow = cmd['id']
-            await self.delete_command(snow, guild_id=guild_id)
+            await self.http.bulk_upsert_guild_commands(self.application_id, guild_id, [])
+        else:
+            await self.http.bulk_upsert_global_commands(self.application_id, [])
 
     async def delete_command(self, id: int, *, guild_id: int | None = None):
         """
@@ -204,9 +198,11 @@ class Bot(commands.Bot):
         - guild_id: ``Optional[str]``
         - - The guild ID to delete from, or ``None`` to delete a global command.
         """
-        route = discord.http.Route('DELETE', f'/applications/{self.application_id}{f"/guilds/{guild_id}" if guild_id else ""}/commands/{id}')
-        await self.http.request(route)
- 
+        if guild_id is not None:
+            await self.http.delete_guild_command(self.application_id, guild_id, id)
+        else:
+            await self.http.delete_global_command(self.application_id, id)
+
     async def sync_commands(self) -> None:
         """
         Uploads all commands from cogs found and syncs them with discord.
@@ -215,6 +211,7 @@ class Bot(commands.Bot):
         if not self.application_id:
             raise RuntimeError("sync_commands must be called after `run`, `start` or `login`")
 
+        command_payloads = defaultdict(list)
         for cog in self.cogs.values():
             if not isinstance(cog, ApplicationCog):
                 continue
@@ -226,17 +223,15 @@ class Bot(commands.Bot):
             for _, cmd in slashes:
                 cmd.cog = cog
                 cog._commands[cmd.name] = cmd
-                
-                route = f"/applications/{self.application_id}"
-
-                if cmd.guild_id:
-                    route += f"/guilds/{cmd.guild_id}"
-                route += '/commands'
-
                 body = cmd._build_command_payload()
+                command_payloads[cmd.guild_id].append(body)
 
-                route = discord.http.Route('POST', route)
-                await self.http.request(route, json=body)
+        global_commands = command_payloads.pop(None, [])
+        if global_commands:
+            await self.http.bulk_upsert_global_commands(self.application_id, global_commands)
+
+        for guild_id, payload in command_payloads.items():
+            await self.http.bulk_upsert_guild_commands(self.application_id, guild_id, payload)
 
 class Context(Generic[BotT, CogT]):
     """

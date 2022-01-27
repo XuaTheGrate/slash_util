@@ -35,7 +35,7 @@ These parameters may only be used inside ``slash commands``, not within context 
 - ``bool`` for booleans
 - ``discord.User`` or ``discord.Member`` for members
 - ``discord.Role`` for roles
-- ``typing.Literal`` option choices (see [Literals](#literals) for more information)
+- ``typing.Literal`` for option choices (see [Literals](#literals) for more information)
 
 For defining channel parameters, they are documented in [Channels](#channels)
 

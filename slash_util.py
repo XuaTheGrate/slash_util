@@ -18,7 +18,7 @@ CtxT = TypeVar("CtxT", bound='Context')
 CogT = TypeVar("CogT", bound='ApplicationCog')
 NumT = Union[int, float]
 
-__all__ = ['describe','choices','SlashCommand', 'ApplicationCog', 'Range', 'Context', 'Bot', 'slash_command', 'message_command', 'user_command']
+__all__ = ['describe','choices', 'SlashCommand', 'ApplicationCog', 'Range', 'Context', 'Bot', 'slash_command', 'message_command', 'user_command']
 
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, ClassVar
@@ -89,7 +89,6 @@ def choices(**kwargs):
                 func._param_choices_={param:choices}
         return cmd
     return _inner
-
 
 def slash_command(**kwargs) -> Callable[[CmdT], SlashCommand]:
     """
@@ -238,9 +237,15 @@ class Bot(commands.Bot):
         for cog in self.cogs.values():
             if not isinstance(cog, ApplicationCog):
                 continue
+                
+            if not hasattr(cog, "_commands"):
+                cog._commands = {}
 
-            for cmd in cog._commands.values():
+            slashes = inspect.getmembers(cog, lambda c: isinstance(c, Command))
+            for _, cmd in slashes:
                 cmd.cog = cog
+                cog._commands[cmd.name] = cmd
+                
                 route = f"/applications/{self.application_id}"
 
                 if cmd.guild_id:
@@ -372,6 +377,7 @@ class SlashCommand(Command[CogT]):
         self._parameter_descriptions: dict[str, str] = defaultdict(lambda: "No description provided")
         self._parameter_choices:dict[str,list]={}
 
+
     def _build_arguments(self, interaction, state):
         if 'options' not in interaction.data:
             return {}
@@ -421,7 +427,6 @@ class SlashCommand(Command[CogT]):
 
     def _build_command_payload(self):
         self._build_descriptions()
-        self._build_choices()
 
         payload = {
             "name": self.name,
@@ -474,12 +479,14 @@ class SlashCommand(Command[CogT]):
 
                 elif issubclass(ann, discord.abc.GuildChannel):
                     option['channel_types'] = [channel_filter[ann]]
+                    
                 if self._parameter_choices.get(name):
                     choiceslist=[]
                     for i in self._parameter_choices.get(name):
                         for n,v in i.items():
                             choiceslist.append({"name":n,"value":v})
                     option['choices']=choiceslist
+                    
                 options.append(option)
             options.sort(key=lambda f: not f.get('required'))
             payload['options'] = options
@@ -563,11 +570,7 @@ class ApplicationCog(commands.Cog, Generic[BotT]):
     - - The bot instance."""
     def __init__(self, bot: BotT):
         self.bot: BotT = bot
-        self._commands: dict[str, Command] = {}
-
-        slashes = inspect.getmembers(self, lambda c: isinstance(c, Command))
-        for k, v in slashes:
-            self._commands[v.name] = v
+        self._commands: dict[str, Command]
     
     async def slash_command_error(self, ctx: Context[BotT, Self], error: Exception) -> None:
         print("Error occured in command", ctx.command.name, file=sys.stderr)

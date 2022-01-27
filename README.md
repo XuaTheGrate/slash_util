@@ -226,6 +226,26 @@ Returns
 - [``discord.InteractionMessage``](https://discordpy.readthedocs.io/en/master/api.html#discord.InteractionMessage) if this is the first time responding.
 - [``discord.WebhookMessage``](https://discordpy.readthedocs.io/en/master/api.html#discord.WebhookMessage) for consecutive responses.
 
+> ``async def defer(self, *, ephemeral: bool = False) -> None:``
+
+
+Defers the given interaction.
+
+This is done to acknowledge the interaction.
+A secondary action will need to be sent within 15 minutes through the follow-up webhook.
+
+Parameters:
+- ephemeral: ``Optional[bool]``
+- - Indicates whether the deferred message will eventually be ephemeral. Defaults to `False`
+
+Returns
+- ``None``
+
+Raises
+- [``discord.HTTPException``](https://discordpy.readthedocs.io/en/master/api.html#discord.HTTPException)
+- - Deferring the interaction failed.
+- [``discord.InteractionResponded``](https://discordpy.readthedocs.io/en/master/api.html#discord.InteractionResponded)
+- - This interaction has been responded to before.
 
 > ``property cog(self)``
 

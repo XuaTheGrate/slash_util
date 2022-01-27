@@ -253,7 +253,6 @@ class Context(Generic[BotT, CogT]):
         self.bot = bot
         self.command = command
         self.interaction = interaction
-        self._responded = False
 
     @overload
     def send(self, content: str = MISSING, *, embed: discord.Embed = MISSING, ephemeral: bool = MISSING, tts: bool = MISSING, view: discord.ui.View = MISSING, file: discord.File = MISSING) -> Coroutine[Any, Any, Union[discord.InteractionMessage, discord.WebhookMessage]]: ...
@@ -295,13 +294,34 @@ class Context(Generic[BotT, CogT]):
         - [``discord.InteractionMessage``](https://discordpy.readthedocs.io/en/master/api.html#discord.InteractionMessage) if this is the first time responding.
         - [``discord.WebhookMessage``](https://discordpy.readthedocs.io/en/master/api.html#discord.WebhookMessage) for consecutive responses.
         """
-        if self._responded:
+        if self.interaction.is_done():
             return await self.interaction.followup.send(content, wait=True, **kwargs)
 
         await self.interaction.response.send_message(content or None, **kwargs)
-        self._responded = True
 
         return await self.interaction.original_message()
+
+    async def defer(self, *, ephemeral: bool = False) -> None:
+        """
+        Defers the given interaction.
+
+        This is done to acknowledge the interaction.
+        A secondary action will need to be sent within 15 minutes through the follow-up webhook.
+
+        Parameters:
+        - ephemeral: ``Optional[bool]``
+        - - Indicates whether the deferred message will eventually be ephemeral. Defaults to `False`
+
+        Returns
+        - ``None``
+
+        Raises
+        - [``discord.HTTPException``](https://discordpy.readthedocs.io/en/master/api.html#discord.HTTPException)
+        - - Deferring the interaction failed.
+        - [``discord.InteractionResponded``](https://discordpy.readthedocs.io/en/master/api.html#discord.InteractionResponded)
+        - - This interaction has been responded to before.
+        """
+        await self.interaction.response.defer(ephemeral=ephemeral)
     
     @property
     def cog(self) -> CogT:

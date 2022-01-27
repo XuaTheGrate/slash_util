@@ -294,7 +294,7 @@ class Context(Generic[BotT, CogT]):
         - [``discord.InteractionMessage``](https://discordpy.readthedocs.io/en/master/api.html#discord.InteractionMessage) if this is the first time responding.
         - [``discord.WebhookMessage``](https://discordpy.readthedocs.io/en/master/api.html#discord.WebhookMessage) for consecutive responses.
         """
-        if self.interaction.is_done():
+        if self.interaction.response.is_done():
             return await self.interaction.followup.send(content, wait=True, **kwargs)
 
         await self.interaction.response.send_message(content or None, **kwargs)

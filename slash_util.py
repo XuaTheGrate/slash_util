@@ -83,6 +83,10 @@ def choices(**kwargs):
     def _inner(cmd):
         func=cmd.func if isinstance(cmd,SlashCommand) else cmd
         for param,choices in kwargs.items():
+            if func.__annotations__.get(param) is None:
+                raise TypeError(f"@choice used to give choices to a non-existant paramter `{param}`")
+            if not issubclass((t:=func.__annotations__.get(param)),(str,int)):
+                raise TypeError(f"Slash command option choices can have only str and int types, `{t}` was provided.")
             try:
                 func._param_choices_[param]=choices
             except AttributeError:
@@ -420,14 +424,12 @@ class SlashCommand(Command[CogT]):
         if not hasattr(self.func,'_param_choices_'):
             return
 
-        for k,v in self.func._param_choices_.items():
-            if k not in self.parameters:
-                raise TypeError(f"@choice used to give choices to a non-existant paramter `{k}`")
+        for k,v in self.func._param_choices_.items():                
             self._parameter_choices[k]=v
 
     def _build_command_payload(self):
         self._build_descriptions()
-
+        self._build_choices()
         payload = {
             "name": self.name,
             "description": self.description,
@@ -486,7 +488,6 @@ class SlashCommand(Command[CogT]):
                         for n,v in i.items():
                             choiceslist.append({"name":n,"value":v})
                     option['choices']=choiceslist
-                    
                 options.append(option)
             options.sort(key=lambda f: not f.get('required'))
             payload['options'] = options

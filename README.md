@@ -35,6 +35,7 @@ These parameters may only be used inside ``slash commands``, not within context 
 - ``bool`` for booleans
 - ``discord.User`` or ``discord.Member`` for members
 - ``discord.Role`` for roles
+- ``typing.Literal`` option choices (see [Literals](#literals) for more information)
 
 For defining channel parameters, they are documented in [Channels](#channels)
 
@@ -57,6 +58,20 @@ async def my_command(self, ctx, channel: typing.Union[discord.TextChannel, disco
   await ctx.send(f'{channel.mention} is not a category!', ephemeral=True)
 ```
 
+## Literals
+A [typing.Literal](https://docs.python.org/3/library/typing.html#typing.Literal) is a special type hint that requires the passed parameter to be equal to one of the listed values.
+The passed literals must be all the same type, which must be either ``str``, `int` or ``float``.
+These will be used to create a list of options for the user to select from.
+For example, given the following:
+
+```python
+from typing import Literal
+
+@slash_util.slash_command()
+async def shop(self, ctx, buy_sell: Literal['buy', 'sell'], amount: Literal[1, 2], item: str):
+    await ctx.send(f'{buy_sell.capitalize()}ing {amount} {item}(s)!')
+```
+The ``buy_sell`` parameter must be either the literal string ``"buy"`` or ``"sell"`` and amount must be the int ``1`` or ``2``. 
 ## Examples
 ``slash_util`` defines a bot subclass to automatically handle posting updated commands to discords api. This isn't required but highly recommended to use.
 ```python

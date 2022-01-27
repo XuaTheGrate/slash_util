@@ -11,7 +11,7 @@ import discord, discord.channel, discord.http, discord.state
 from discord.ext import commands
 from discord.utils import MISSING
 
-from typing import Coroutine, TypeVar, Union, get_args, get_origin, overload, Generic, TYPE_CHECKING
+from typing import Coroutine, TypeVar, Union, get_args, get_origin, overload, Generic, TYPE_CHECKING, Literal
 
 BotT = TypeVar("BotT", bound='Bot')
 CtxT = TypeVar("CtxT", bound='Context')
@@ -437,6 +437,8 @@ class SlashCommand(Command[CogT]):
                 elif get_origin(ann) is Union:
                     args = get_args(ann)
                     real_t = args[0]
+                elif get_origin(ann) is Literal:
+                    real_t = str
                 else:
                     real_t = ann
 
@@ -462,6 +464,10 @@ class SlashCommand(Command[CogT]):
                     if len(args) != 3:
                         filtered = [channel_filter[i] for i in args]
                         option['channel_types'] = filtered
+
+                elif get_origin(ann) is Literal:
+                    arguments = ann.__args__
+                    option['choices'] = [{'name': str(a), 'value': str(a)} for a in arguments]
 
                 elif issubclass(ann, discord.abc.GuildChannel):
                     option['channel_types'] = [channel_filter[ann]]

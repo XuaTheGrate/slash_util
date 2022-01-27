@@ -236,7 +236,7 @@ This is done to acknowledge the interaction.
 A secondary action will need to be sent within 15 minutes through the follow-up webhook.
 
 Parameters:
-- ephemeral: ``Optional[bool]``
+- ephemeral: ``bool``
 - - Indicates whether the deferred message will eventually be ephemeral. Defaults to `False`
 
 Returns

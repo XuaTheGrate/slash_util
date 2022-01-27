@@ -438,7 +438,7 @@ class SlashCommand(Command[CogT]):
                     args = get_args(ann)
                     real_t = args[0]
                 elif get_origin(ann) is Literal:
-                    real_t = str
+                    real_t = type(ann.__args__[0])
                 else:
                     real_t = ann
 
@@ -467,7 +467,7 @@ class SlashCommand(Command[CogT]):
 
                 elif get_origin(ann) is Literal:
                     arguments = ann.__args__
-                    option['choices'] = [{'name': a, 'value': a} for a in arguments]
+                    option['choices'] = [{'name': str(a), 'value': a} for a in arguments]
 
                 elif issubclass(ann, discord.abc.GuildChannel):
                     option['channel_types'] = [channel_filter[ann]]

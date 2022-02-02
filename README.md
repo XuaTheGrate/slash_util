@@ -17,21 +17,10 @@ pip install -U git+https://github.com/Rapptz/discord.py
 ```
 This script will NOT work without it. See [this message](https://canary.discord.com/channels/336642139381301249/336642139381301249/859172828430336010) for more information on discord.py 2.0
 
-#### NEW
-
 You can now install slash_util from PyPI:
 ```
 pip install -U slash-util
 ```
-
-#### The old way
-
-1. Go to the [slash_util.py file](https://github.com/XuaTheGrate/slash_util/blob/master/slash_util.py)
-
-2. Click the following button
-![img](https://i.imgur.com/7fFuS88.png)
-
-3. Copy the entire text and paste it into your own file, then proceed to import it into files you need.
 
 ## Defining parameters
 A few different parameter types can be specified in accordance with the discord api.

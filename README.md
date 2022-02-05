@@ -84,7 +84,7 @@ if __name__ == '__main__':
 ```
 Sample cog:
 ```python
-class MyCog(slash_util.ApplicationCog):
+class MyCog(slash_util.Cog):
     @slash_util.slash_command()  # sample slash command
     async def slash(self, ctx: slash_util.Context, number: int):
         await ctx.send(f"You selected #{number}!", ephemeral=True)
@@ -282,7 +282,7 @@ The channel the interaction was executed in.
 The user that executed this interaction.
 
 
-##### ``class ApplicationCog(*args: Any, **kwargs: Any)``
+##### ``class Cog(*args: Any, **kwargs: Any)``
 The cog that must be used for application commands.
 
 Attributes:

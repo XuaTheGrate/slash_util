@@ -76,6 +76,9 @@ class Context(Generic[BotT, CogT]):
         - [``discord.InteractionMessage``](https://discordpy.readthedocs.io/en/master/api.html#discord.InteractionMessage) if this is the first time responding.
         - [``discord.WebhookMessage``](https://discordpy.readthedocs.io/en/master/api.html#discord.WebhookMessage) for consecutive responses.
         """
+        if kwargs.get("file") or kwargs.get('files'):
+            await self.defer(ephemeral=kwargs.get('ephemeral', False))
+
         if self.interaction.response.is_done():
             return await self.interaction.followup.send(content, wait=True, **kwargs)
 

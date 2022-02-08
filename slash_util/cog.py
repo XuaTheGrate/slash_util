@@ -15,9 +15,20 @@ BotT = TypeVar("BotT", bound='Bot')
 
 if TYPE_CHECKING:
     from .bot import Bot
-    from typing_extensions import Self
+    from typing import Awaitable, Any, Callable
+    from typing_extensions import Self, ParamSpec, Concatenate
+
+    WrapperPS = ParamSpec("WrapperPS")
 
 __all__ = ['Cog']
+
+async def command_error_wrapper(func: Callable[WrapperPS, Awaitable[Any]], *args: WrapperPS.args, **kwargs: WrapperPS.kwargs) -> Any:
+    try:
+        return await func(*args, **kwargs)
+    except commands.CommandError:
+        raise
+    except Exception as e:
+        raise commands.CommandInvokeError(e) from e
 
 class Cog(commands.Cog, Generic[BotT]):
     """
@@ -50,8 +61,6 @@ class Cog(commands.Cog, Generic[BotT]):
         
         ctx = Context(self.bot, command, interaction)
         try:
-            await command.invoke(ctx, **params)
+            await command_error_wrapper(command.invoke, ctx, **params)
         except commands.CommandError as e:
             await self.slash_command_error(ctx, e)
-        except Exception as e:
-            await self.slash_command_error(ctx, commands.CommandInvokeError(e))

@@ -36,6 +36,7 @@ These parameters may only be used inside ``slash commands``, not within context 
 - ``typing.Literal`` for option choices (see [Literals](#literals) for more information)
 
 For defining channel parameters, they are documented in [Channels](#channels)
+
 Parameters can also be optional, see [Optional](#optional)
 
 ## Ranges

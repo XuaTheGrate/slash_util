@@ -84,6 +84,19 @@ async def add(self, ctx, a: int, b: int, c: int = 0):
 ```
 If the `c` parameter isn't given, it will be defaulted to 0. This will also show up to the user as an optional argument.
 
+The default value isn't type restricted as well, this is to support `None` types but this could be used to give any other type. This means the above example can be rewritten in two ways -
+
+```python
+@slash_util.slash_command()
+async def add(self, ctx, a: int, b: int, c: int = None):
+    ...
+
+@slash_util.slash_command()
+async def add(self, ctx, a: int, b: int, c: int = '0'):
+    ...
+```
+Same as before, only the `c` parameter will give a different value in the two examples. The first one will give `None` and the second will give a string `'0'`. If the user gives `c` then it is restricted to integers.
+
 ## Examples
 ``slash_util`` defines a bot subclass to automatically handle posting updated commands to discords api. This isn't required but highly recommended to use.
 ```python

@@ -36,6 +36,7 @@ These parameters may only be used inside ``slash commands``, not within context 
 - ``typing.Literal`` for option choices (see [Literals](#literals) for more information)
 
 For defining channel parameters, they are documented in [Channels](#channels)
+Parameters can also be optional, see [Optional](#optional)
 
 ## Ranges
 Ranges are a way to specify minimum and maximum values for ``ints`` and ``floats``. They can be defined inside a type hint, for example:
@@ -70,6 +71,18 @@ async def shop(self, ctx, buy_sell: Literal['buy', 'sell'], amount: Literal[1, 2
     await ctx.send(f'{buy_sell.capitalize()}ing {amount} {item}(s)!')
 ```
 The ``buy_sell`` parameter must be either the literal string ``"buy"`` or ``"sell"`` and amount must be the int ``1`` or ``2``. 
+
+## Optional
+A parameter can be optional by assigning a default value to it.
+
+```python
+@slash_util.slash_command()
+async def add(self, ctx, a: int, b: int, c: int = 0):
+    total = a + b + c
+    await ctx.send(f"{a} + {b} + {c} = {total}")
+```
+If the `c` parameter isn't given, it will be defaulted to 0. This will also show up to the user as an optional argument.
+
 ## Examples
 ``slash_util`` defines a bot subclass to automatically handle posting updated commands to discords api. This isn't required but highly recommended to use.
 ```python

@@ -64,6 +64,13 @@ def _parse_resolved_data(interaction: discord.Interaction, data, state: discord.
         for id, d in resolved_roles.items():
             role = discord.Role(guild=interaction.guild, state=state, data=d)
             resolved[int(id)] = role
+         
+    resolved_attachments = data.get('attachments')
+    if resolved_attachments:
+        for id, d in resolved_attachments.items():
+            attachment = discord.Attachment(state=state, data=d)
+            resolved[int(id)] = attachment
+            
 
     return resolved
 
@@ -77,7 +84,8 @@ command_type_map: dict[type[Any], int] = {
     discord.VoiceChannel: 7,
     discord.CategoryChannel: 7,
     discord.Role: 8,
-    float: 10
+    float: 10,
+    discord.Attachment: 11
 }
 
 channel_filter: dict[type[discord.abc.GuildChannel], int] = {

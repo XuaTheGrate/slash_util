@@ -37,6 +37,8 @@ These parameters may only be used inside ``slash commands``, not within context 
 
 For defining channel parameters, they are documented in [Channels](#channels)
 
+Parameters can also be optional, see [Optional](#optional)
+
 ## Ranges
 Ranges are a way to specify minimum and maximum values for ``ints`` and ``floats``. They can be defined inside a type hint, for example:
 ```python
@@ -70,6 +72,31 @@ async def shop(self, ctx, buy_sell: Literal['buy', 'sell'], amount: Literal[1, 2
     await ctx.send(f'{buy_sell.capitalize()}ing {amount} {item}(s)!')
 ```
 The ``buy_sell`` parameter must be either the literal string ``"buy"`` or ``"sell"`` and amount must be the int ``1`` or ``2``. 
+
+## Optional
+A parameter can be optional by assigning a default value to it.
+
+```python
+@slash_util.slash_command()
+async def add(self, ctx, a: int, b: int, c: int = 0):
+    total = a + b + c
+    await ctx.send(f"{a} + {b} + {c} = {total}")
+```
+If the `c` parameter isn't given, it will be defaulted to 0. This will also show up to the user as an optional argument.
+
+The default value isn't type restricted as well, this is to support `None` types but this could be used to give any other type. This means the above example can be rewritten in two ways -
+
+```python
+@slash_util.slash_command()
+async def add(self, ctx, a: int, b: int, c: int = None):
+    ...
+
+@slash_util.slash_command()
+async def add(self, ctx, a: int, b: int, c: int = '0'):
+    ...
+```
+Same as before, only the `c` parameter will give a different value in the two examples. The first one will give `None` and the second will give a string `'0'`. If the user gives `c` then it is restricted to integers.
+
 ## Examples
 ``slash_util`` defines a bot subclass to automatically handle posting updated commands to discords api. This isn't required but highly recommended to use.
 ```python

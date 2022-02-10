@@ -33,6 +33,7 @@ These parameters may only be used inside ``slash commands``, not within context 
 - ``bool`` for booleans
 - ``discord.User`` or ``discord.Member`` for members
 - ``discord.Role`` for roles
+- ``discord.Attachment`` for attaching files (see [Attachments](#attachments) for more information)
 - ``typing.Literal`` for option choices (see [Literals](#literals) for more information)
 
 For defining channel parameters, they are documented in [Channels](#channels)
@@ -56,6 +57,14 @@ You can specify multiple channel types via ``typing.Union``:
 @slash_util.slash_command()
 async def my_command(self, ctx, channel: typing.Union[discord.TextChannel, discord.VoiceChannel]):
   await ctx.send(f'{channel.mention} is not a category!', ephemeral=True)
+```
+
+## Attachments
+NEW: Discord now lets you upload attachments to slash commands. ``slash_util`` supports this via the ``discord.Attachment`` type hint, for example:
+```python
+@slash_util.slash_command()
+async def my_command(self, ctx, attachment: discord.Attachment):
+    await ctx.send("Your file:", file=await attachment.to_file())
 ```
 
 ## Literals

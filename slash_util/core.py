@@ -50,7 +50,7 @@ def _parse_resolved_data(interaction: discord.Interaction, data, state: discord.
         for id, d in resolved_channels.items():
             d['position'] = None
             cls, _ = discord.channel._guild_channel_factory(d['type'])
-            channel = cls(state=state, guild=interaction.guild, data=d)
+            channel = cls(state=state, guild=interaction.guild, data=d)  # type: ignore
             resolved[int(id)] = channel
 
     resolved_messages = data.get('messages')

@@ -116,9 +116,7 @@ def create_interaction_response(
     token: str,
     *,
     session: aiohttp.ClientSession,
-    type: int,
-    data: dict[str, Any] = MISSING,
-    files: list[File] = MISSING
+    data: ExecuteWebhookParameters
 ) -> Response[None]:
     route = Route(
         'POST',
@@ -127,15 +125,7 @@ def create_interaction_response(
         webhook_token=token,
     )
 
-    data = data or {}
-
-    params = handle_message_parameters(
-        **data,
-        files=files,
-        type=type
-    )
-
-    return self.request(route, session=session, payload=params.payload, files=params.files, multipart=params.multipart)
+    return self.request(route, session=session, payload=data.payload, files=data.files, multipart=data.multipart)
 
 async def send_message(
     self,
@@ -148,51 +138,28 @@ async def send_message(
     view: View = MISSING,
     tts: bool = False,
     ephemeral: bool = False,
+    allowed_mentions: AllowedMentions = MISSING
 ) -> None:
     if self._responded:
         raise InteractionResponded(self._parent)
 
-    payload: dict[str, Any] = {
-        'tts': tts,
-    }
-
-    if embed is not MISSING and embeds is not MISSING:
-        raise TypeError('cannot mix embed and embeds keyword arguments')
-
-    if file is not MISSING and files is not MISSING:
-        raise TypeError('cannot mix file and files keyword arguments')
-    
-    if file is not MISSING:
-        files = [file]
-
-    if embed is not MISSING:
-        embeds = [embed]
-
-    if embeds:
-        if len(embeds) > 10:
-            raise ValueError('embeds cannot exceed maximum of 10 elements')
-        payload['embeds'] = [e.to_dict() for e in embeds]
-
-    if content is not None:
-        payload['content'] = str(content)
-
-    if ephemeral:
-        payload['flags'] = 64
-
-    if view is not MISSING:
-        payload['components'] = view.to_components()
-
     parent = self._parent
 
-    adapter = async_context.get()
-    await adapter.create_interaction_response(
-        parent.id,
-        parent.token,
-        session=parent._session,
+    payload = handle_message_parameters(
+        content=content,
+        tts=tts,
+        ephemeral=ephemeral,
         type=InteractionResponseType.channel_message.value,
-        data=payload,
-        files=files  # type: ignore
+        embed=embed,
+        embeds=embeds,
+        view=view,
+        file=file,
+        files=files,
+        allowed_mentions=allowed_mentions
     )
+
+    adapter = async_context.get()
+    await adapter.create_interaction_response(parent.id, parent.token, session=parent._session, data=payload)  # type: ignore
 
     if view is not MISSING:
         if ephemeral and view.timeout is None:

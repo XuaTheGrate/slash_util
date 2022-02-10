@@ -283,7 +283,6 @@ class SlashCommand(Command[CogT]):
                     real_t = type(ann.__args__[0])
                 else:
                     real_t = ann
-                    print(real_t)
 
                 typ = command_type_map[real_t]
                 option = {

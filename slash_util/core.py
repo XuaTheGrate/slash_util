@@ -85,7 +85,7 @@ command_type_map: dict[type[Any], int] = {
     discord.CategoryChannel: 7,
     discord.Role: 8,
     float: 10,
-    discord.message.Attachment: 11
+    discord.Attachment: 11
 }
 
 channel_filter: dict[type[discord.abc.GuildChannel], int] = {

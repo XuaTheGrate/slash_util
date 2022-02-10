@@ -223,10 +223,7 @@ class SlashCommand(Command[CogT]):
         result = {}
         for option in interaction.data['options']:
             value = option['value']
-            if option['type'] in (6, 7, 8):
-                value = resolved[int(value)]
-            
-            if option['type'] == 11:
+            if option['type'] in (6, 7, 8, 11):
                 value = resolved[int(value)]
 
             result[option['name']] = value

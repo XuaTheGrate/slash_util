@@ -225,6 +225,7 @@ class SlashCommand(Command[CogT]):
             value = option['value']
             if option['type'] in (6, 7, 8, 11):
                 value = resolved[int(value)]
+                print(value)
 
             result[option['name']] = value
         return result

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import aiohttp
-from discord import Embed, AllowedMentions, InvalidArgument, InteractionResponded, InteractionResponseType
+from discord import Embed, AllowedMentions, InvalidArgument, InteractionResponded, InteractionResponseType, InteractionType, Attachment
 from discord.ui import View
 from discord.utils import MISSING, _to_json as to_json
 from discord.http import Route
@@ -25,15 +25,20 @@ def handle_message_parameters(
     ephemeral: bool = False,
     file: File = MISSING,
     files: list[File] = MISSING,
-    embed: Embed = MISSING,
+    embed: Embed | None = MISSING,
     embeds: list[Embed] = MISSING,
-    view: View = MISSING,
+    view: View | None = MISSING,
     allowed_mentions: AllowedMentions = MISSING,
     previous_allowed_mentions: AllowedMentions | None = None,
-    type: int = MISSING
+    type: int = MISSING,
+    attachments: list[Attachment] = MISSING
 ) -> ExecuteWebhookParameters:
     if files is not MISSING and file is not MISSING:
         raise TypeError('Cannot mix file and files keyword arguments.')
+
+    if (file is not MISSING or files is not MISSING) and attachments is not MISSING:
+        raise TypeError('Cannot mix file/files and attachments arguments.')
+
     if embeds is not MISSING and embed is not MISSING:
         raise TypeError('Cannot mix embed and embeds keyword arguments.')
 
@@ -76,6 +81,9 @@ def handle_message_parameters(
             payload['allowed_mentions'] = allowed_mentions.to_dict()
     elif previous_allowed_mentions is not None:
         payload['allowed_mentions'] = previous_allowed_mentions.to_dict()
+
+    if attachments is not MISSING:
+        payload['attachments'] = [a.to_dict() for a in attachments]
 
     if type is not MISSING:
         payload = {'type': type, 'data': payload}
@@ -169,6 +177,82 @@ async def send_message(
 
     self._responded = True
 
+async def defer(self, *, ephemeral: bool = False) -> None:
+    if self._responded:
+        raise InteractionResponded(self._parent)
+
+    defer_type: int = 0
+
+    parent = self._parent
+    if parent.type is InteractionType.component:
+        defer_type = InteractionResponseType.deferred_message_update.value
+    elif parent.type is InteractionType.application_command:
+        defer_type = InteractionResponseType.deferred_channel_message.value
+
+    payload = handle_message_parameters(type = defer_type or MISSING, ephemeral=ephemeral)
+
+    if defer_type:
+        adapter = async_context.get()
+        await adapter.create_interaction_response(
+            parent.id, parent.token, session=parent._session, data=payload
+        )  # type: ignore
+        self._responded = True
+
+async def pong(self) -> None:
+    if self._responded:
+        raise InteractionResponded(self._parent)
+
+    parent = self._parent
+    if parent.type is InteractionType.ping:
+        adapter = async_context.get()
+        data = handle_message_parameters(type = InteractionResponseType.pong.value)
+        await adapter.create_interaction_response(
+            parent.id, parent.token, session=parent._session, data=data
+        )  # type: ignore
+        self._responded = True
+
+async def edit_message(
+    self,
+    *,
+    content: Any | None = MISSING,
+    embed: Embed | None = MISSING,
+    embeds: list[Embed] = MISSING,
+    attachments: list[Attachment] = MISSING,
+    view: View | None = MISSING,
+) -> None:
+    if self._responded:
+        raise InteractionResponded(self._parent)
+
+    parent = self._parent
+    msg = parent.message
+    state = parent._state
+    message_id = msg.id if msg else None
+
+    if parent.type is not InteractionType.component:
+        return
+
+    payload = handle_message_parameters(
+        content=content,
+        embed=embed,
+        embeds=embeds,
+        attachments=attachments,
+        view=view,
+        type=InteractionResponseType.message_update.value
+    )
+    Attachment.to_dict
+
+    adapter = async_context.get()
+    await adapter.create_interaction_response(
+        parent.id,
+        parent.token,
+        session=parent._session,
+        data=payload,
+    )  # type: ignore
+    if view and not view.is_finished():
+        state.store_view(view, message_id)
+    self._responded = True
+
+
 
 def inject():
     from discord.webhook import async_
@@ -177,3 +261,7 @@ def inject():
     async_.handle_message_parameters = handle_message_parameters
     AsyncWebhookAdapter.create_interaction_response = create_interaction_response  # type: ignore
     InteractionResponse.send_message = send_message
+    InteractionResponse.defer = defer
+    InteractionResponse.pong = pong
+    InteractionResponse.edit_message = edit_message
+    

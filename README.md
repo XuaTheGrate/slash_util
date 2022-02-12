@@ -15,7 +15,7 @@ pip install -U slash-util
 
 ## Features
 - [Application Commands (slash commands + message/user context menu commands)](#application-commands)
-- [New Modal interaction]()
+- [New Modal interaction](#modals)
 
 ## Application Commands
 

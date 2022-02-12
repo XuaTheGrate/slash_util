@@ -15,6 +15,7 @@ BotT = TypeVar("BotT", bound='Bot')
 
 if TYPE_CHECKING:
     from .bot import Bot
+    from .modal import Modal
     from typing import Awaitable, Any, Callable
     from typing_extensions import Self, ParamSpec, Concatenate
 
@@ -47,6 +48,16 @@ class Cog(commands.Cog, Generic[BotT]):
 
     @commands.Cog.listener("on_interaction")
     async def _internal_interaction_handler(self, interaction: discord.Interaction):
+        if interaction.type.value == 5:  # MODAL_SUBMIT
+            if not hasattr(self.bot._connection, '_modals'):
+                self.bot._connection._modals = {}  # type: ignore
+
+            custom_id = interaction.data['custom_id']  # type: ignore
+            modal: Modal | None = self.bot._connection._modals.pop(custom_id, None)  # type: ignore
+            if modal is not None:
+                modal._response.set_result(interaction)
+            return
+
         if interaction.type is not discord.InteractionType.application_command:
             return
             

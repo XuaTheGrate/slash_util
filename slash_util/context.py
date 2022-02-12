@@ -15,6 +15,8 @@ if TYPE_CHECKING:
     from typing import Any, Coroutine, Union
     from .bot import Bot
     from .cog import Cog
+    from .modal import Modal
+    from ._patch import InteractionResponse
     
 
 __all__ = ['Context']
@@ -34,6 +36,10 @@ class Context(Generic[BotT, CogT]):
         self.bot = bot
         self.command = command
         self.interaction = interaction
+    
+    @property
+    def response(self) -> InteractionResponse:
+        return self.interaction.response  # type: ignore
 
     @overload
     def send(self, content: str = MISSING, *, embed: discord.Embed = MISSING, ephemeral: bool = MISSING, tts: bool = MISSING, view: discord.ui.View = MISSING, file: discord.File = MISSING) -> Coroutine[Any, Any, Union[discord.InteractionMessage, discord.WebhookMessage]]: ...
@@ -47,7 +53,11 @@ class Context(Generic[BotT, CogT]):
     @overload
     def send(self, content: str = MISSING, *, embeds: list[discord.Embed] = MISSING, ephemeral: bool = MISSING, tts: bool = MISSING, view: discord.ui.View = MISSING, files: list[discord.File] = MISSING) -> Coroutine[Any, Any, Union[discord.InteractionMessage, discord.WebhookMessage]]: ...
 
-    async def send(self, content = MISSING, **kwargs) -> Union[discord.InteractionMessage, discord.WebhookMessage]:
+    @overload
+    def send(self, *, modal: Modal = MISSING) -> Coroutine[Any, Any, None]:
+        ...
+
+    async def send(self, content = MISSING, **kwargs):
         """
         Responds to the given interaction. If you have responded already, this will use the follow-up webhook instead.
         Parameters ``embed`` and ``embeds`` cannot be specified together.
@@ -76,12 +86,18 @@ class Context(Generic[BotT, CogT]):
         - [``discord.InteractionMessage``](https://discordpy.readthedocs.io/en/master/api.html#discord.InteractionMessage) if this is the first time responding.
         - [``discord.WebhookMessage``](https://discordpy.readthedocs.io/en/master/api.html#discord.WebhookMessage) for consecutive responses.
         """
-        if self.interaction.response.is_done():
+        if 'modal' in kwargs:
+            return await self._send_modal(modal=kwargs['modal'])
+
+        if self.response.is_done():
             return await self.interaction.followup.send(content, wait=True, **kwargs)
 
-        await self.interaction.response.send_message(content or None, **kwargs)
+        await self.response.send_message(content or None, **kwargs)
 
         return await self.interaction.original_message()
+
+    async def _send_modal(self, modal: Modal):
+        await self.response.send_modal(modal=modal)
 
     async def defer(self, *, ephemeral: bool = False) -> None:
         """

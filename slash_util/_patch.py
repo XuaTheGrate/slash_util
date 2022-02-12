@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import aiohttp
 from discord import Embed, AllowedMentions, InvalidArgument, InteractionResponded, InteractionResponseType, InteractionType, Attachment
+from discord import InteractionResponse as DpyInteractionResponse
 from discord.ui import View
 from discord.utils import MISSING, _to_json as to_json
 from discord.http import Route
 from discord.webhook.async_ import AsyncWebhookAdapter, ExecuteWebhookParameters, async_context
+
+from .modal import Modal
 
 from typing import TYPE_CHECKING
 
@@ -31,8 +34,12 @@ def handle_message_parameters(
     allowed_mentions: AllowedMentions = MISSING,
     previous_allowed_mentions: AllowedMentions | None = None,
     type: int = MISSING,
-    attachments: list[Attachment] = MISSING
+    attachments: list[Attachment] = MISSING,
+    modal: Modal = MISSING
 ) -> ExecuteWebhookParameters:
+    if modal is not MISSING:
+        return ExecuteWebhookParameters(payload={"type": 9, "data": modal.to_dict()}, multipart=None, files=None)
+
     if files is not MISSING and file is not MISSING:
         raise TypeError('Cannot mix file and files keyword arguments.')
 
@@ -135,133 +142,144 @@ def create_interaction_response(
 
     return self.request(route, session=session, payload=data.payload, files=data.files, multipart=data.multipart)
 
-async def send_message(
-    self,
-    content: Any | None = None,
-    *,
-    embed: Embed = MISSING,
-    embeds: list[Embed] = MISSING,
-    file: File = MISSING,
-    files: list[File] = MISSING,
-    view: View = MISSING,
-    tts: bool = False,
-    ephemeral: bool = False,
-    allowed_mentions: AllowedMentions = MISSING
-) -> None:
-    if self._responded:
-        raise InteractionResponded(self._parent)
+class InteractionResponse(DpyInteractionResponse):
+    async def send_message(
+        self,
+        content: Any | None = None,
+        *,
+        embed: Embed = MISSING,
+        embeds: list[Embed] = MISSING,
+        file: File = MISSING,
+        files: list[File] = MISSING,
+        view: View = MISSING,
+        tts: bool = False,
+        ephemeral: bool = False,
+        allowed_mentions: AllowedMentions = MISSING
+    ) -> None:
+        if self._responded:
+            raise InteractionResponded(self._parent)
 
-    parent = self._parent
+        parent = self._parent
 
-    payload = handle_message_parameters(
-        content=content,
-        tts=tts,
-        ephemeral=ephemeral,
-        type=InteractionResponseType.channel_message.value,
-        embed=embed,
-        embeds=embeds,
-        view=view,
-        file=file,
-        files=files,
-        allowed_mentions=allowed_mentions
-    )
+        payload = handle_message_parameters(
+            content=content,
+            tts=tts,
+            ephemeral=ephemeral,
+            type=InteractionResponseType.channel_message.value,
+            embed=embed,
+            embeds=embeds,
+            view=view,
+            file=file,
+            files=files,
+            allowed_mentions=allowed_mentions
+        )
 
-    adapter = async_context.get()
-    await adapter.create_interaction_response(parent.id, parent.token, session=parent._session, data=payload)  # type: ignore
-
-    if view is not MISSING:
-        if ephemeral and view.timeout is None:
-            view.timeout = 15 * 60.0
-
-        self._parent._state.store_view(view)
-
-    self._responded = True
-
-async def defer(self, *, ephemeral: bool = False) -> None:
-    if self._responded:
-        raise InteractionResponded(self._parent)
-
-    defer_type: int = 0
-
-    parent = self._parent
-    if parent.type is InteractionType.component:
-        defer_type = InteractionResponseType.deferred_message_update.value
-    elif parent.type is InteractionType.application_command:
-        defer_type = InteractionResponseType.deferred_channel_message.value
-
-    payload = handle_message_parameters(type = defer_type or MISSING, ephemeral=ephemeral)
-
-    if defer_type:
         adapter = async_context.get()
-        await adapter.create_interaction_response(
-            parent.id, parent.token, session=parent._session, data=payload
-        )  # type: ignore
+        await adapter.create_interaction_response(parent.id, parent.token, session=parent._session, data=payload)  # type: ignore
+
+        if view is not MISSING:
+            if ephemeral and view.timeout is None:
+                view.timeout = 15 * 60.0
+
+            self._parent._state.store_view(view)
+
         self._responded = True
 
-async def pong(self) -> None:
-    if self._responded:
-        raise InteractionResponded(self._parent)
+    async def defer(self, *, ephemeral: bool = False) -> None:
+        if self._responded:
+            raise InteractionResponded(self._parent)
 
-    parent = self._parent
-    if parent.type is InteractionType.ping:
+        defer_type: int = 0
+
+        parent = self._parent
+        if parent.type is InteractionType.component:
+            defer_type = InteractionResponseType.deferred_message_update.value
+        elif parent.type is InteractionType.application_command:
+            defer_type = InteractionResponseType.deferred_channel_message.value
+
+        payload = handle_message_parameters(type = defer_type or MISSING, ephemeral=ephemeral)
+
+        if defer_type:
+            adapter = async_context.get()
+            await adapter.create_interaction_response(
+                parent.id, parent.token, session=parent._session, data=payload
+            )  # type: ignore
+            self._responded = True
+
+    async def pong(self) -> None:
+        if self._responded:
+            raise InteractionResponded(self._parent)
+
+        parent = self._parent
+        if parent.type is InteractionType.ping:
+            adapter = async_context.get()
+            data = handle_message_parameters(type = InteractionResponseType.pong.value)
+            await adapter.create_interaction_response(
+                parent.id, parent.token, session=parent._session, data=data
+            )  # type: ignore
+            self._responded = True
+
+    async def edit_message(
+        self,
+        *,
+        content: Any | None = MISSING,
+        embed: Embed | None = MISSING,
+        embeds: list[Embed] = MISSING,
+        attachments: list[Attachment] = MISSING,
+        view: View | None = MISSING,
+    ) -> None:
+        if self._responded:
+            raise InteractionResponded(self._parent)
+
+        parent = self._parent
+        msg = parent.message
+        state = parent._state
+        message_id = msg.id if msg else None
+
+        if parent.type is not InteractionType.component:
+            return
+
+        payload = handle_message_parameters(
+            content=content,
+            embed=embed,
+            embeds=embeds,
+            attachments=attachments,
+            view=view,
+            type=InteractionResponseType.message_update.value
+        )
+        Attachment.to_dict
+
         adapter = async_context.get()
-        data = handle_message_parameters(type = InteractionResponseType.pong.value)
         await adapter.create_interaction_response(
-            parent.id, parent.token, session=parent._session, data=data
+            parent.id,
+            parent.token,
+            session=parent._session,
+            data=payload,
         )  # type: ignore
+        if view and not view.is_finished():
+            state.store_view(view, message_id)
         self._responded = True
 
-async def edit_message(
-    self,
-    *,
-    content: Any | None = MISSING,
-    embed: Embed | None = MISSING,
-    embeds: list[Embed] = MISSING,
-    attachments: list[Attachment] = MISSING,
-    view: View | None = MISSING,
-) -> None:
-    if self._responded:
-        raise InteractionResponded(self._parent)
+    async def send_modal(self, modal: Modal) -> None:
+        if not hasattr(self._parent._state, "_modals"):
+            self._parent._state._modals = {}  # type: ignore
+        self._parent._state._modals[modal.custom_id] = modal  # type: ignore
 
-    parent = self._parent
-    msg = parent.message
-    state = parent._state
-    message_id = msg.id if msg else None
-
-    if parent.type is not InteractionType.component:
-        return
-
-    payload = handle_message_parameters(
-        content=content,
-        embed=embed,
-        embeds=embeds,
-        attachments=attachments,
-        view=view,
-        type=InteractionResponseType.message_update.value
-    )
-    Attachment.to_dict
-
-    adapter = async_context.get()
-    await adapter.create_interaction_response(
-        parent.id,
-        parent.token,
-        session=parent._session,
-        data=payload,
-    )  # type: ignore
-    if view and not view.is_finished():
-        state.store_view(view, message_id)
-    self._responded = True
-
-
+        parent = self._parent
+        if self._responded:
+            raise InteractionResponded(self._parent)
+        
+        payload = handle_message_parameters(modal=modal)
+        adapter = async_context.get()
+        await adapter.create_interaction_response(parent.id, parent.token, session=parent._session, data=payload)  # type: ignore
+        self._responded = True
 
 def inject():
+    import discord
     from discord.webhook import async_
-    from discord.interactions import InteractionResponse
+
+    discord.interactions.InteractionResponse = InteractionResponse
 
     async_.handle_message_parameters = handle_message_parameters
     AsyncWebhookAdapter.create_interaction_response = create_interaction_response  # type: ignore
-    InteractionResponse.send_message = send_message
-    InteractionResponse.defer = defer
-    InteractionResponse.pong = pong
-    InteractionResponse.edit_message = edit_message
     

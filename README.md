@@ -1,13 +1,4 @@
-# slash_util is a simple wrapper around slash commands for discord.py
-This is written by an official discord.py helper to try and stop people using third party forks or otherwise. If any help is required, please ping Maya#9000 in one of the help channels. To any other helpers reading this, this script is exempt from rule 14.
-
-## Table of contents
-- [Installation](#installation)
-- [Defining parameters](#defining-parameters)
-- [Ranges](#ranges)
-- [Channels](#channels)
-- [Examples](#examples)
-- [API documentation](#api-documentation)
+# slash_util is a library that adds new features to discord.py
 
 ## Installation
 
@@ -22,7 +13,13 @@ You can now install slash_util from PyPI:
 pip install -U slash-util
 ```
 
-## Defining parameters
+## Features
+- [Application Commands (slash commands + message/user context menu commands)](#application-commands)
+- [New Modal interaction]()
+
+## Application Commands
+
+### Defining parameters
 A few different parameter types can be specified in accordance with the discord api.
 
 These parameters may only be used inside ``slash commands``, not within context menu commands.
@@ -40,7 +37,7 @@ For defining channel parameters, they are documented in [Channels](#channels)
 
 Parameters can also be optional, see [Optional](#optional)
 
-## Ranges
+### Ranges
 Ranges are a way to specify minimum and maximum values for ``ints`` and ``floats``. They can be defined inside a type hint, for example:
 ```python
 @slash_util.slash_command()
@@ -50,7 +47,7 @@ async def my_command(self, ctx, number: slash_util.Range[0, 10]):
 ```
 If you specify a float in either parameter, the value will be a float.
 
-## Channels
+### Channels
 Channels can be defined using ``discord.TextChannel``, ``VoiceChannel`` or ``CategoryChannel``.
 You can specify multiple channel types via ``typing.Union``:
 ```python
@@ -59,7 +56,7 @@ async def my_command(self, ctx, channel: typing.Union[discord.TextChannel, disco
   await ctx.send(f'{channel.mention} is not a category!', ephemeral=True)
 ```
 
-## Attachments
+### Attachments
 NEW: Discord now lets you upload attachments to slash commands. ``slash_util`` supports this via the ``discord.Attachment`` type hint, for example:
 ```python
 @slash_util.slash_command()
@@ -67,7 +64,7 @@ async def my_command(self, ctx, attachment: discord.Attachment):
     await ctx.send("Your file:", file=await attachment.to_file())
 ```
 
-## Literals
+### Literals
 A [typing.Literal](https://docs.python.org/3/library/typing.html#typing.Literal) is a special type hint that requires the passed parameter to be equal to one of the listed values.
 The passed literals must be all the same type, which must be either ``str``, `int` or ``float``.
 These will be used to create a list of options for the user to select from.
@@ -82,7 +79,7 @@ async def shop(self, ctx, buy_sell: Literal['buy', 'sell'], amount: Literal[1, 2
 ```
 The ``buy_sell`` parameter must be either the literal string ``"buy"`` or ``"sell"`` and amount must be the int ``1`` or ``2``. 
 
-## Optional
+### Optional
 A parameter can be optional by assigning a default value to it.
 
 ```python
@@ -105,6 +102,31 @@ async def add(self, ctx, a: int, b: int, c: int = '0'):
     ...
 ```
 Same as before, only the `c` parameter will give a different value in the two examples. The first one will give `None` and the second will give a string `'0'`. If the user gives `c` then it is restricted to integers.
+
+## Modals
+
+Discord recently added a new interaction type - Modals. These aren't supported with discord.py, and I've decided to implement them in my library.
+```python
+import slash_util
+
+@slash_util.slash_command()
+async def modal(self, ctx):
+    modal = slash_util.Modal(title="Hello, world!", items=[
+        slash_util.TextInput(custom_id="name", label="What is your name?", style=slash_util.TextInputStyle.short),  # custom_id is important!
+        slash_util.TextInput(custom_id="about", label="Tell us about yourself!", style=slash_util.TextInputStyle.paragraph)
+    ])
+    await ctx.send(modal=modal)
+
+    try:
+        interaction = await modal.wait(timeout=60.0)
+    except asyncio.TimeoutError:
+        await ctx.send("You didn't respond in time...")
+        return
+    
+    response = modal.response  # this will be a dict with the custom_ids above as the keys, and the user responses as the values
+    name = response['name']
+    await interaction.response.send_message(f"Hello, {name}!")
+```
 
 ## Examples
 ``slash_util`` defines a bot subclass to automatically handle posting updated commands to discords api. This isn't required but highly recommended to use.

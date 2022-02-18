@@ -40,7 +40,7 @@ class Cog(commands.Cog, Generic[BotT]):
     - - The bot instance."""
     def __init__(self, bot: BotT):
         self.bot: BotT = bot
-        self._commands: dict[str, Command]
+        self._commands: dict[str, Command] = {}
     
     async def slash_command_error(self, ctx: Context[BotT, Self], error: Exception) -> None:
         print("Error occured in command", ctx.command.name, file=sys.stderr)

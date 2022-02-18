@@ -10,7 +10,7 @@ from .core import Command
 
 __all__ = ['Bot']
 
-class Bot(commands.Bot):
+class Bot(commands.AutoShardedBot):
     application_id: int  # hack to avoid linting errors on http methods
 
     async def start(self, token: str, *, reconnect: bool = True) -> None:

@@ -114,7 +114,7 @@ def describe(**kwargs):
         return cmd
     return _inner
 
-def autocomplete(name: str, func_or_class: Union[Callable[[CtxT, str], list[str]], Callable[[CtxT, str], Awaitable[list[str]]], _AutocompleteProtocol]):
+def autocomplete(name: str, func_or_class: Union[Callable[[CtxT, str], list[float|int|str]], Callable[[CtxT, str], Awaitable[list[float|int|str]]], _AutocompleteProtocol]):
     """
     Set autocomplete handlers for specified parameters of the slash command.
     """
@@ -314,8 +314,8 @@ class SlashCommand(Command[CogT]):
                     real_t = args[0]
                 elif get_origin(ann) is Literal:
                     real_t = type(ann.__args__[0])
-                elif name in self.func._autocomplete_handlers_ and hasattr(self.func, "_autocomplete_handlers_"):
-                    real_t = str
+                elif hasattr(self.func, "_autocomplete_handlers_") and name in self.func._autocomplete_handlers_:
+                    real_t = ann if ann in (int, str, float) else str
                 else:
                     real_t = ann
 

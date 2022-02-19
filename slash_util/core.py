@@ -4,7 +4,11 @@ import inspect
 from collections import defaultdict
 from typing import TYPE_CHECKING, TypeVar, overload, Union, Generic, get_origin, get_args, Literal
 
-import discord, discord.state
+import discord
+import discord.state
+from discord.ext import commands
+import discord.ext.commands._types
+from .cog import Cog
 
 NumT = Union[int, float]
 
@@ -17,7 +21,6 @@ if TYPE_CHECKING:
     from typing_extensions import Concatenate, ParamSpec
 
     from .bot import Bot
-    from .cog import Cog
     from .context import Context
 
     CmdP = ParamSpec("CmdP")
@@ -29,11 +32,13 @@ if TYPE_CHECKING:
     RngT = TypeVar("RngT", bound="Range")
 
 __all__ = ['describe', 'slash_command', 'message_command', 'user_command', 'Range', 'Command', 'SlashCommand', 'ContextMenuCommand', 'UserCommand', 'MessageCommand']
+
+
 def _parse_resolved_data(interaction: discord.Interaction, data, state: discord.state.ConnectionState):
     if not data:
         return {}
 
-    assert interaction.guild 
+    assert interaction.guild
     resolved = {}
 
     resolved_users = data.get('users')
@@ -44,7 +49,7 @@ def _parse_resolved_data(interaction: discord.Interaction, data, state: discord.
             member_data['user'] = d
             member = discord.Member(data=member_data, guild=interaction.guild, state=state)
             resolved[int(id)] = member
-        
+
     resolved_channels = data.get('channels')
     if resolved_channels:
         for id, d in resolved_channels.items():
@@ -64,15 +69,16 @@ def _parse_resolved_data(interaction: discord.Interaction, data, state: discord.
         for id, d in resolved_roles.items():
             role = discord.Role(guild=interaction.guild, state=state, data=d)
             resolved[int(id)] = role
-         
+
     resolved_attachments = data.get('attachments')
     if resolved_attachments:
         for id, d in resolved_attachments.items():
             attachment = discord.Attachment(state=state, data=d)
             resolved[int(id)] = attachment
-            
+
 
     return resolved
+
 
 command_type_map: dict[type[Any], int] = {
     str: 3,
@@ -94,6 +100,7 @@ channel_filter: dict[type[discord.abc.GuildChannel], int] = {
     discord.CategoryChannel: 4
 }
 
+
 def describe(**kwargs):
     """
     Sets the description for the specified parameters of the slash command. Sample usage:
@@ -114,10 +121,11 @@ def describe(**kwargs):
         return cmd
     return _inner
 
+
 def slash_command(**kwargs) -> Callable[[CmdT], SlashCommand]:
     """
     Defines a function as a slash-type application command.
-    
+
     Parameters:
     - name: ``str``
     - - The display name of the command. If unspecified, will use the functions name.
@@ -129,11 +137,12 @@ def slash_command(**kwargs) -> Callable[[CmdT], SlashCommand]:
     def _inner(func: CmdT) -> SlashCommand:
         return SlashCommand(func, **kwargs)
     return _inner
-    
+
+
 def message_command(**kwargs) -> Callable[[MsgCmdT], MessageCommand]:
     """
     Defines a function as a message-type application command.
-    
+
     Parameters:
     - name: ``str``
     - - The display name of the command. If unspecified, will use the functions name.
@@ -144,10 +153,11 @@ def message_command(**kwargs) -> Callable[[MsgCmdT], MessageCommand]:
         return MessageCommand(func, **kwargs)
     return _inner
 
+
 def user_command(**kwargs) -> Callable[[UsrCmdT], UserCommand]:
     """
     Defines a function as a user-type application command.
-    
+
     Parameters:
     - name: ``str``
     - - The display name of the command. If unspecified, will use the functions name.
@@ -158,7 +168,9 @@ def user_command(**kwargs) -> Callable[[UsrCmdT], UserCommand]:
         return UserCommand(func, **kwargs)
     return _inner
 
+
 class _RangeMeta(type):
+
     @overload
     def __getitem__(cls: type[RngT], max: int) -> type[int]: ...
     @overload
@@ -173,6 +185,7 @@ class _RangeMeta(type):
             return cls(*max)
         return cls(None, max)
 
+
 class Range(metaclass=_RangeMeta):
     """
     Defines a minimum and maximum value for float or int values. The minimum value is optional.
@@ -186,11 +199,13 @@ class Range(metaclass=_RangeMeta):
         self.min = min
         self.max = max
 
+
 class Command(Generic[CogT]):
     cog: CogT
     func: Callable
     name: str
     guild_id: int | None
+    checks: list[discord.ext.commands._types.Check]
 
     def _build_command_payload(self) -> dict[str, Any]:
         raise NotImplementedError
@@ -201,7 +216,9 @@ class Command(Generic[CogT]):
     async def invoke(self, context: Context[BotT, CogT], **params) -> None:
         await self.func(self.cog, context, **params)
 
+
 class SlashCommand(Command[CogT]):
+
     def __init__(self, func: CmdT, **kwargs):
         self.func = func
         self.cog: CogT
@@ -235,7 +252,7 @@ class SlashCommand(Command[CogT]):
             params.pop(0)
         except IndexError:
             raise ValueError("expected argument `self` is missing")
-        
+
         try:
             params.pop(0)
         except IndexError:
@@ -246,7 +263,7 @@ class SlashCommand(Command[CogT]):
     def _build_descriptions(self):
         if not hasattr(self.func, '_param_desc_'):
             return
-        
+
         for k, v in self.func._param_desc_.items():
             if k not in self.parameters:
                 raise TypeError(f"@describe used to describe a non-existant parameter `{k}`")
@@ -292,7 +309,7 @@ class SlashCommand(Command[CogT]):
                 }
                 if param.default is param.empty:
                     option['required'] = True
-                
+
                 if isinstance(ann, Range):
                     option['max_value'] = ann.max
                     option['min_value'] = ann.min
@@ -313,11 +330,36 @@ class SlashCommand(Command[CogT]):
 
                 elif issubclass(ann, discord.abc.GuildChannel):
                     option['channel_types'] = [channel_filter[ann]]
-                
+
                 options.append(option)
             options.sort(key=lambda f: not f.get('required'))
             payload['options'] = options
         return payload
+
+    async def can_run(self, ctx: Context[BotT, CogT]) -> bool:
+
+        if not await ctx.bot.can_run(ctx):
+            raise commands.CheckFailure(f"The global check functions for application command '{self.name}' failed.")
+
+        local_check = Cog._get_overridden_method(self.cog.cog_check)
+        if local_check is not None:
+            ret = await discord.utils.maybe_coroutine(local_check, ctx)
+            if not ret:
+                return False
+
+        predicates = self.checks
+        if not predicates:
+            return True
+
+        return await discord.utils.async_all(predicate(ctx) for predicate in predicates)  # type: ignore
+
+    async def invoke(self, context: Context[BotT, CogT], **params) -> None:
+
+        if not await self.can_run(context):
+            raise commands.CheckFailure(f"The check functions for application command '{self.name}' failed.")
+
+        await self.func(self.cog, context, **params)
+
 
 class ContextMenuCommand(Command[CogT]):
     _type: ClassVar[int]
@@ -344,8 +386,10 @@ class ContextMenuCommand(Command[CogT]):
     async def invoke(self, context: Context[BotT, CogT], **params) -> None:
         await self.func(self.cog, context, *params.values())
 
+
 class MessageCommand(ContextMenuCommand[CogT]):
     _type = 3
+
 
 class UserCommand(ContextMenuCommand[CogT]):
     _type = 2

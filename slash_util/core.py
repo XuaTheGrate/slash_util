@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import inspect
 from collections import defaultdict
-import types
-from typing import TYPE_CHECKING, Coroutine, Protocol, TypeVar, overload, Union, Generic, get_origin, get_args, Literal, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, TypeVar, overload, Union, Generic, get_origin, get_args, Literal, runtime_checkable, Awaitable
 
 import discord, discord.state
 
@@ -29,7 +28,7 @@ if TYPE_CHECKING:
 
     RngT = TypeVar("RngT", bound="Range")
 
-__all__ = ['describe', 'slash_command', 'message_command', 'user_command', 'Range', 'Command', 'SlashCommand', 'ContextMenuCommand', 'UserCommand', 'MessageCommand']
+__all__ = ['describe', 'slash_command', 'message_command', 'user_command', 'Range', 'Command', 'SlashCommand', 'ContextMenuCommand', 'UserCommand', 'MessageCommand', 'autocomplete']
 def _parse_resolved_data(interaction: discord.Interaction, data, state: discord.state.ConnectionState):
     if not data:
         return {}
@@ -115,13 +114,13 @@ def describe(**kwargs):
         return cmd
     return _inner
 
-def autocomplete(name: str, func_or_class: Union[Coroutine, _AutocompleteProtocolWithConverter]):
+def autocomplete(name: str, func_or_class: Union[Callable[[CtxT, str], list[str]], Callable[[CtxT, str], Awaitable[list[str]]], _AutocompleteProtocol]):
     """
     Set autocomplete handlers for specified parameters of the slash command.
     """
     def _inner(cmd):
         func = cmd.func if isinstance(cmd, SlashCommand) else cmd
-        if isinstance(func_or_class, type) and not issubclass(func_or_class, _AutocompleteProtocolWithConverter):
+        if inspect.isclass(func_or_class) and not issubclass(func_or_class, _AutocompleteProtocol):
             raise TypeError(f"{func_or_class} is not a valid autocomplete handler. It must implement the convert and autocomplete method.")
         try:
             func._autocomplete_handlers_[name] = func_or_class
@@ -204,7 +203,7 @@ class Range(metaclass=_RangeMeta):
         self.max = max
         
 @runtime_checkable
-class _AutocompleteProtocolWithConverter(Protocol):
+class _AutocompleteProtocol(Protocol):
     async def autocomplete(self, ctx, arg) -> Any: ...
 
     async def convert(self, ctx, arg) -> Any: ...
@@ -250,8 +249,16 @@ class SlashCommand(Command[CogT]):
             if option['type'] in (6, 7, 8, 11):
                 value = resolved[int(value)]
             
-            if isinstance(self.func._autocomplete_handlers_[option['name']], type):
-                result[option['name']] = await self.func._autocomplete_handlers_[option['name']].convert(ctx, value)
+            if not hasattr(self.func, '_autocomplete_handlers_'):
+                continue
+            converter = self.func._autocomplete_handlers_.get(option['name'])
+            if inspect.isclass(converter) and issubclass(converter, _AutocompleteProtocol): 
+                if inspect.ismethod(converter.convert): 
+                    result[option['name']] = await discord.utils.maybe_coroutine(converter.convert, ctx, value)
+                else:
+                    result[option['name']] = await discord.utils.maybe_coroutine(converter().convert, ctx, value) # type: ignore
+            elif isinstance(converter, _AutocompleteProtocol):
+                result[option['name']] = await discord.utils.maybe_coroutine(converter.convert, ctx, value)
             else:
                 result[option['name']] = value
         return result

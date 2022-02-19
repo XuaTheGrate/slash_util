@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import traceback
 import sys
 from typing import TYPE_CHECKING, Generic, TypeVar
@@ -9,7 +10,7 @@ from discord.ext import commands
 
 
 from .context import Context
-from .core import Command
+from .core import Command, _AutocompleteProtocol
 
 BotT = TypeVar("BotT", bound='Bot')
 
@@ -61,12 +62,20 @@ class Cog(commands.Cog, Generic[BotT]):
         if interaction.type.value == 4: # AUTOCOMPLETE
             command = self._commands.get(interaction.data['name']) # type: ignore
             options = interaction.data["options"] # type: ignore
-            option = [option for option in options if option.get("focused", None)][0] 
-            handler = command.func._autocomplete_handlers_[option["name"]] # type: ignore
-            handler_func = handler if not isinstance(handler, type) else handler.autocomplete # type: ignore
+            focused = [option for option in options if option.get("focused")][0] 
+            handler = command.func._autocomplete_handlers_[focused["name"]] # type: ignore
+            value = focused["value"] # type: ignore
 
             ctx = Context(self.bot, command, interaction) # type: ignore
-            result = await handler_func(ctx, option["value"]) # type: ignore
+            if inspect.isclass(handler) and issubclass(handler, _AutocompleteProtocol):
+                if inspect.ismethod(handler.autocomplete):
+                    result = await discord.utils.maybe_coroutine(handler.autocomplete, ctx, value)
+                else:
+                    result = await discord.utils.maybe_coroutine(handler().autocomplete, ctx, value) # type: ignore
+            elif isinstance(handler, _AutocompleteProtocol):
+                result = await discord.utils.maybe_coroutine(handler.autocomplete, ctx, value)
+            else:
+                result = await discord.utils.maybe_coroutine(handler, ctx, value) # type: ignore
             payload = {"type": 8, "data": {"choices": [{"name": str(option), "value": str(option)} for option in result]}}
             await interaction.response.send_autocomplete_result(payload) # type: ignore
             return

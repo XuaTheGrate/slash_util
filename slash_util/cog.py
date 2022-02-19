@@ -76,8 +76,8 @@ class Cog(commands.Cog, Generic[BotT]):
                 result = await discord.utils.maybe_coroutine(handler.autocomplete, ctx, value)
             else:
                 result = await discord.utils.maybe_coroutine(handler, ctx, value) # type: ignore
-            payload = {"type": 8, "data": {"choices": [{"name": str(option), "value": str(option)} for option in result]}}
-            await interaction.response.send_autocomplete_result(payload) # type: ignore
+            data =  {"choices": [{"name": str(option), "value": str(option)} for option in result]}
+            await interaction.response.send_autocomplete_result(data) # type: ignore
             return
 
         if interaction.type is not discord.InteractionType.application_command:

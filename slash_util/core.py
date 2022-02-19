@@ -218,7 +218,7 @@ class Command(Generic[CogT]):
     def _build_command_payload(self) -> dict[str, Any]:
         raise NotImplementedError
 
-    async def _build_arguments(self, ctx: Context, interaction: discord.Interaction, state: discord.state.ConnectionState) -> dict[str, Any]:
+    async def _build_arguments(self, ctx: Context[BotT, CogT], interaction: discord.Interaction, state: discord.state.ConnectionState) -> dict[str, Any]:
         raise NotImplementedError
 
     async def invoke(self, context: Context[BotT, CogT], **params) -> None:
@@ -250,6 +250,7 @@ class SlashCommand(Command[CogT]):
                 value = resolved[int(value)]
             
             if not hasattr(self.func, '_autocomplete_handlers_'):
+                result[option['name']] = value
                 continue
             converter = self.func._autocomplete_handlers_.get(option['name'])
             if inspect.isclass(converter) and issubclass(converter, _AutocompleteProtocol): 
@@ -259,8 +260,6 @@ class SlashCommand(Command[CogT]):
                     result[option['name']] = await discord.utils.maybe_coroutine(converter().convert, ctx, value) # type: ignore
             elif isinstance(converter, _AutocompleteProtocol):
                 result[option['name']] = await discord.utils.maybe_coroutine(converter.convert, ctx, value)
-            else:
-                result[option['name']] = value
         return result
 
     def _build_parameters(self) -> dict[str, inspect.Parameter]:
@@ -375,7 +374,7 @@ class ContextMenuCommand(Command[CogT]):
             payload['guild_id'] = self.guild_id
         return payload
 
-    async def _build_arguments(self, ctx: Context, interaction: discord.Interaction, state: discord.state.ConnectionState) -> dict[str, Any]:
+    async def _build_arguments(self, ctx: Context[BotT, CogT], interaction: discord.Interaction, state: discord.state.ConnectionState) -> dict[str, Any]:
         resolved = _parse_resolved_data(interaction, interaction.data.get('resolved'), state)  # type: ignore
         value = resolved[int(interaction.data['target_id'])]  # type: ignore
         return {'target': value}

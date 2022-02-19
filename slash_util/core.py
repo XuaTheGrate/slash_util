@@ -205,7 +205,7 @@ class Command(Generic[CogT]):
     func: Callable
     name: str
     guild_id: int | None
-    checks: list[discord.ext.commands._types.Check]
+    checks: list[commands._types.Check]
 
     def _build_command_payload(self) -> dict[str, Any]:
         raise NotImplementedError
@@ -231,6 +231,12 @@ class SlashCommand(Command[CogT]):
 
         self.parameters = self._build_parameters()
         self._parameter_descriptions: dict[str, str] = defaultdict(lambda: "No description provided")
+
+        try:
+            checks = function.__commands_checks__  # type: ignore
+        except AttributeError:
+            checks = kwargs.get("checks", [])
+        self.checks: list[commands._types.Check] = checks  # type: ignore
 
     def _build_arguments(self, interaction, state):
         if 'options' not in interaction.data:

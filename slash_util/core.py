@@ -213,8 +213,27 @@ class Command(Generic[CogT]):
     def _build_arguments(self, interaction: discord.Interaction, state: discord.state.ConnectionState) -> dict[str, Any]:
         raise NotImplementedError
 
+    async def can_run(self, ctx: Context[BotT, CogT]) -> bool:
+
+        if not await ctx.bot.can_run(ctx):
+            raise commands.CheckFailure(f"The global check functions for application command '{self.name}' failed.")
+
+        local_check = Cog._get_overridden_method(self.cog.cog_check)
+        if local_check is not None:
+            ret = await discord.utils.maybe_coroutine(local_check, ctx)
+            if not ret:
+                return False
+
+        predicates = self.checks
+        if not predicates:
+            return True
+
+        return await discord.utils.async_all(predicate(ctx) for predicate in predicates)  # type: ignore
+
     async def invoke(self, context: Context[BotT, CogT], **params) -> None:
-        await self.func(self.cog, context, **params)
+
+        if not await self.can_run(context):
+            raise commands.CheckFailure(f"The check functions for application command '{self.name}' failed.")
 
 
 class SlashCommand(Command[CogT]):
@@ -342,28 +361,8 @@ class SlashCommand(Command[CogT]):
             payload['options'] = options
         return payload
 
-    async def can_run(self, ctx: Context[BotT, CogT]) -> bool:
-
-        if not await ctx.bot.can_run(ctx):
-            raise commands.CheckFailure(f"The global check functions for application command '{self.name}' failed.")
-
-        local_check = Cog._get_overridden_method(self.cog.cog_check)
-        if local_check is not None:
-            ret = await discord.utils.maybe_coroutine(local_check, ctx)
-            if not ret:
-                return False
-
-        predicates = self.checks
-        if not predicates:
-            return True
-
-        return await discord.utils.async_all(predicate(ctx) for predicate in predicates)  # type: ignore
-
     async def invoke(self, context: Context[BotT, CogT], **params) -> None:
-
-        if not await self.can_run(context):
-            raise commands.CheckFailure(f"The check functions for application command '{self.name}' failed.")
-
+        await super().invoke(context, **params)
         await self.func(self.cog, context, **params)
 
 
@@ -374,6 +373,12 @@ class ContextMenuCommand(Command[CogT]):
         self.func = func
         self.guild_id: int | None = kwargs.get('guild_id', None)
         self.name: str = kwargs.get('name', func.__name__)
+
+        try:
+            checks = function.__commands_checks__  # type: ignore
+        except AttributeError:
+            checks = kwargs.get("checks", [])
+        self.checks: list[commands._types.Check] = checks  # type: ignore
 
     def _build_command_payload(self):
         payload = {
@@ -390,6 +395,7 @@ class ContextMenuCommand(Command[CogT]):
         return {'target': value}
 
     async def invoke(self, context: Context[BotT, CogT], **params) -> None:
+        await super().invoke(context, **params)
         await self.func(self.cog, context, *params.values())
 
 

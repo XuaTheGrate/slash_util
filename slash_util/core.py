@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import inspect
 from collections import defaultdict
-from typing import TYPE_CHECKING, TypeVar, overload, Union, Generic, get_origin, get_args, Literal
+import types
+from typing import TYPE_CHECKING, Coroutine, Protocol, TypeVar, overload, Union, Generic, get_origin, get_args, Literal, runtime_checkable
 
 import discord, discord.state
 
@@ -114,6 +115,22 @@ def describe(**kwargs):
         return cmd
     return _inner
 
+def autocomplete(name: str, func_or_class: Union[Coroutine, _AutocompleteProtocolWithConverter]):
+    """
+    Set autocomplete handlers for specified parameters of the slash command.
+    """
+    def _inner(cmd):
+        func = cmd.func if isinstance(cmd, SlashCommand) else cmd
+        if isinstance(func_or_class, type) and not issubclass(func_or_class, _AutocompleteProtocolWithConverter):
+            raise TypeError(f"{func_or_class} is not a valid autocomplete handler. It must implement the convert and autocomplete method.")
+        try:
+            func._autocomplete_handlers_[name] = func_or_class
+        except AttributeError:
+            func._autocomplete_handlers_ = {name: func_or_class}
+        return cmd
+    return _inner
+
+
 def slash_command(**kwargs) -> Callable[[CmdT], SlashCommand]:
     """
     Defines a function as a slash-type application command.
@@ -185,6 +202,13 @@ class Range(metaclass=_RangeMeta):
             raise ValueError("`min` value must be lower than `max`")
         self.min = min
         self.max = max
+        
+@runtime_checkable
+class _AutocompleteProtocolWithConverter(Protocol):
+    async def autocomplete(self, ctx, arg) -> Any: ...
+
+    async def convert(self, ctx, arg) -> Any: ...
+
 
 class Command(Generic[CogT]):
     cog: CogT
@@ -195,7 +219,7 @@ class Command(Generic[CogT]):
     def _build_command_payload(self) -> dict[str, Any]:
         raise NotImplementedError
 
-    def _build_arguments(self, interaction: discord.Interaction, state: discord.state.ConnectionState) -> dict[str, Any]:
+    async def _build_arguments(self, ctx: Context, interaction: discord.Interaction, state: discord.state.ConnectionState) -> dict[str, Any]:
         raise NotImplementedError
 
     async def invoke(self, context: Context[BotT, CogT], **params) -> None:
@@ -215,7 +239,7 @@ class SlashCommand(Command[CogT]):
         self.parameters = self._build_parameters()
         self._parameter_descriptions: dict[str, str] = defaultdict(lambda: "No description provided")
 
-    def _build_arguments(self, interaction, state):
+    async def _build_arguments(self, ctx, interaction, state):
         if 'options' not in interaction.data:
             return {}
 
@@ -225,8 +249,11 @@ class SlashCommand(Command[CogT]):
             value = option['value']
             if option['type'] in (6, 7, 8, 11):
                 value = resolved[int(value)]
-
-            result[option['name']] = value
+            
+            if isinstance(self.func._autocomplete_handlers_[option['name']], type):
+                result[option['name']] = await self.func._autocomplete_handlers_[option['name']].convert(ctx, value)
+            else:
+                result[option['name']] = value
         return result
 
     def _build_parameters(self) -> dict[str, inspect.Parameter]:
@@ -281,6 +308,8 @@ class SlashCommand(Command[CogT]):
                     real_t = args[0]
                 elif get_origin(ann) is Literal:
                     real_t = type(ann.__args__[0])
+                elif name in self.func._autocomplete_handlers_ and hasattr(self.func, "_autocomplete_handlers_"):
+                    real_t = str
                 else:
                     real_t = ann
 
@@ -292,6 +321,9 @@ class SlashCommand(Command[CogT]):
                 }
                 if param.default is param.empty:
                     option['required'] = True
+
+                if name in self.func._autocomplete_handlers_ and hasattr(self.func, "_autocomplete_handlers_"):
+                    option['autocomplete'] = True
                 
                 if isinstance(ann, Range):
                     option['max_value'] = ann.max
@@ -336,7 +368,7 @@ class ContextMenuCommand(Command[CogT]):
             payload['guild_id'] = self.guild_id
         return payload
 
-    def _build_arguments(self, interaction: discord.Interaction, state: discord.state.ConnectionState) -> dict[str, Any]:
+    async def _build_arguments(self, ctx: Context, interaction: discord.Interaction, state: discord.state.ConnectionState) -> dict[str, Any]:
         resolved = _parse_resolved_data(interaction, interaction.data.get('resolved'), state)  # type: ignore
         value = resolved[int(interaction.data['target_id'])]  # type: ignore
         return {'target': value}

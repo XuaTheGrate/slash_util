@@ -274,6 +274,13 @@ class InteractionResponse(DpyInteractionResponse):
         await adapter.create_interaction_response(parent.id, parent.token, session=parent._session, data=payload)  # type: ignore
         self._responded = True
 
+    async def send_autocomplete_result(self, data: list) -> None:
+        if self._responded:
+            raise InteractionResponded(self._parent)
+        parent = self._parent
+        adapter = async_context.get()
+        await adapter.create_interaction_response(parent.id, parent.token, session=parent._session, data=ExecuteWebhookParameters(data, None, None)) # type: ignore
+
 def inject():
     import discord
     from discord.webhook import async_

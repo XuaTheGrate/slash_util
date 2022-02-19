@@ -58,6 +58,19 @@ class Cog(commands.Cog, Generic[BotT]):
                 modal._response.set_result(interaction)
             return
 
+        if interaction.type.value == 4: # AUTOCOMPLETE
+            command = self._commands.get(interaction.data['name']) # type: ignore
+            options = interaction.data["options"] # type: ignore
+            option = [option for option in options if option.get("focused", None)][0] 
+            handler = command.func._autocomplete_handlers_[option["name"]] # type: ignore
+            handler_func = handler if not isinstance(handler, type) else handler.autocomplete # type: ignore
+
+            ctx = Context(self.bot, command, interaction) # type: ignore
+            result = await handler_func(ctx, option["value"]) # type: ignore
+            payload = {"type": 8, "data": {"choices": [{"name": str(option), "value": str(option)} for option in result]}}
+            await interaction.response.send_autocomplete_result(payload) # type: ignore
+            return
+
         if interaction.type is not discord.InteractionType.application_command:
             return
             
@@ -68,9 +81,10 @@ class Cog(commands.Cog, Generic[BotT]):
             return
 
         state = self.bot._connection
-        params: dict = command._build_arguments(interaction, state)
-        
+
         ctx = Context(self.bot, command, interaction)
+        params: dict = await command._build_arguments(ctx, interaction, state)
+        
         try:
             await command_error_wrapper(command.invoke, ctx, **params)
         except commands.CommandError as e:

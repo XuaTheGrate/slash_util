@@ -328,7 +328,7 @@ class SlashCommand(Command[CogT]):
                 if param.default is param.empty:
                     option['required'] = True
 
-                if name in self.func._autocomplete_handlers_ and hasattr(self.func, "_autocomplete_handlers_"):
+                if hasattr(self.func, "_autocomplete_handlers_") and name in self.func._autocomplete_handlers_:
                     option['autocomplete'] = True
                 
                 if isinstance(ann, Range):

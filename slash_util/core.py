@@ -238,7 +238,13 @@ class SlashCommand(Command[CogT]):
         self.parameters = self._build_parameters()
         self._parameter_descriptions: dict[str, str] = defaultdict(lambda: "No description provided")
 
-    async def _build_arguments(self, ctx, interaction, state):
+        try:
+            checks = func.__commands_checks__
+        except AttributeError:
+            checks = kwargs.get("checks", [])
+        self.checks: list[commands._types.Check] = checks  # type: ignore
+
+    def _build_arguments(self, interaction, state):
         if 'options' not in interaction.data:
             return {}
 
@@ -364,6 +370,12 @@ class ContextMenuCommand(Command[CogT]):
         self.func = func
         self.guild_id: int | None = kwargs.get('guild_id', None)
         self.name: str = kwargs.get('name', func.__name__)
+
+        try:
+            checks = func.__commands_checks__  # type: ignore
+        except AttributeError:
+            checks = kwargs.get("checks", [])
+        self.checks: list[commands._types.Check] = checks  # type: ignore
 
     def _build_command_payload(self):
         payload = {

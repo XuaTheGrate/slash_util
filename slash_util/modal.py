@@ -18,7 +18,7 @@ class TextInput:
         custom_id: str = MISSING,
         min_length: int | None = None,
         max_length: int | None = None,
-        required: bool = False,
+        required: bool = True,
         default_value: str | None = None,
         placeholder: str | None = None
     ) -> None:
@@ -87,6 +87,11 @@ class Modal:
 
     def is_done(self) -> bool:
         return self._response.done()
+
+    def reset(self) -> None:
+        if not self._response.done():
+            self._response.set_exception(asyncio.CancelledError())
+        self._response = asyncio.Future()
 
     @property
     def response(self) -> dict[str, str]:

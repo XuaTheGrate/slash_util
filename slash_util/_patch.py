@@ -194,7 +194,7 @@ class InteractionResponse(DpyInteractionResponse):
         parent = self._parent
         if parent.type is InteractionType.component:
             defer_type = InteractionResponseType.deferred_message_update.value
-        elif parent.type is InteractionType.application_command:
+        elif parent.type is InteractionType.application_command or parent.type.value == 5:  # MODAL_SUBMIT
             defer_type = InteractionResponseType.deferred_channel_message.value
 
         payload = handle_message_parameters(type = defer_type or MISSING, ephemeral=ephemeral)

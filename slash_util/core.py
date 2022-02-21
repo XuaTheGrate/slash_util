@@ -5,6 +5,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, TypeVar, overload, Union, Generic, get_origin, get_args, Literal
 
 import discord, discord.state
+from discord.ext.commands._types import Check as CheckFn
 
 NumT = Union[int, float]
 
@@ -191,6 +192,7 @@ class Command(Generic[CogT]):
     func: Callable
     name: str
     guild_id: int | None
+    checks: list[CheckFn]
 
     def _build_command_payload(self) -> dict[str, Any]:
         raise NotImplementedError
@@ -200,6 +202,21 @@ class Command(Generic[CogT]):
 
     async def invoke(self, context: Context[BotT, CogT], **params) -> None:
         await self.func(self.cog, context, **params)
+
+    @property
+    def __commands_checks__(self) -> list[CheckFn]:
+        return self.checks
+
+    async def can_run(self, ctx: Context[BotT, CogT]) -> bool:
+        print(self.checks)
+        # TODO: global checks
+
+        # TODO: cog checks
+
+        if not self.checks:
+            return True
+        
+        return await discord.utils.async_all(pred(ctx) for pred in self.checks)  # type: ignore
 
 class SlashCommand(Command[CogT]):
     def __init__(self, func: CmdT, **kwargs):

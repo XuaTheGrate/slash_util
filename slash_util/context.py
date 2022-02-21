@@ -145,3 +145,8 @@ class Context(Generic[BotT, CogT]):
     def author(self) -> discord.Member:
         """The user that executed this interaction."""
         return self.interaction.user  # type: ignore
+
+    @property
+    def me(self) -> discord.Member | None:
+        """The bot member"""
+        return self.interaction.guild.me  # type: ignore

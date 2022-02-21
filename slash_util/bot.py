@@ -63,6 +63,9 @@ class Bot(commands.Bot):
         
         ctx = Context(self, command, interaction)
         try:
+            if not await command_error_wrapper(command.can_run, ctx):
+                raise commands.CheckFailure(f"The check functions for application command '{command.name}' failed")
+
             await command_error_wrapper(command.invoke, ctx, **params)
         except commands.CommandError as e:
             await cog.slash_command_error(ctx, e)

@@ -208,7 +208,6 @@ class Command(Generic[CogT]):
         return self.checks
 
     async def can_run(self, ctx: Context[BotT, CogT]) -> bool:
-        print(self.checks)
         # TODO: global checks
 
         # TODO: cog checks

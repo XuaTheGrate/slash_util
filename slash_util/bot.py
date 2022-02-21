@@ -8,7 +8,7 @@ import discord
 from discord.ext import commands
 
 from .cog import Cog
-from .core import Command
+from .core import Command, AutocompleteConverter
 from .context import Context
 
 if TYPE_CHECKING:
@@ -46,6 +46,27 @@ class Bot(commands.Bot):
             if modal is not None:
                 modal._response.set_result(interaction)
             return
+        
+        if interaction.type.value == 4: # AUTOCOMPLETE
+            command = self.get_application_command(interaction.data['name']) # type: ignore
+            options = interaction.data["options"] # type: ignore
+            focused = [option for option in options if option.get("focused")][0] 
+            handler = command.func._autocomplete_handlers_[focused["name"]] # type: ignore
+            value = focused["value"] # type: ignore
+
+            ctx = Context(self, command, interaction) # type: ignore
+            if inspect.isclass(handler) and issubclass(handler, AutocompleteConverter):
+                if inspect.ismethod(handler.autocomplete):
+                    result = await discord.utils.maybe_coroutine(handler.autocomplete, ctx, value)
+                else:
+                    result = await discord.utils.maybe_coroutine(handler().autocomplete, ctx, value) # type: ignore
+            elif isinstance(handler, AutocompleteConverter):
+                result = await discord.utils.maybe_coroutine(handler.autocomplete, ctx, value)
+            else:
+                result = await discord.utils.maybe_coroutine(handler, self, ctx, value) # type: ignore
+            data = {"choices": [{"name": str(option), "value": option} for option in result]}
+            await interaction.response.send_autocomplete_result(data) # type: ignore
+            return
 
         if interaction.type is not discord.InteractionType.application_command:
             return
@@ -59,9 +80,10 @@ class Bot(commands.Bot):
         cog = command.cog
 
         state = self._connection
-        params: dict = command._build_arguments(interaction, state)
-        
         ctx = Context(self, command, interaction)
+        params: dict = await command._build_arguments(ctx, interaction, state)
+        
+
         try:
             await command_error_wrapper(command.invoke, ctx, **params)
         except commands.CommandError as e:

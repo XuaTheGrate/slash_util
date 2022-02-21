@@ -10,7 +10,7 @@ from discord.ext import commands
 
 
 from .context import Context
-from .core import Command, _AutocompleteProtocol
+from .core import Command, AutocompleteConverter
 
 BotT = TypeVar("BotT", bound='Bot')
 
@@ -67,16 +67,16 @@ class Cog(commands.Cog, Generic[BotT]):
             value = focused["value"] # type: ignore
 
             ctx = Context(self.bot, command, interaction) # type: ignore
-            if inspect.isclass(handler) and issubclass(handler, _AutocompleteProtocol):
+            if inspect.isclass(handler) and issubclass(handler, AutocompleteConverter):
                 if inspect.ismethod(handler.autocomplete):
                     result = await discord.utils.maybe_coroutine(handler.autocomplete, ctx, value)
                 else:
                     result = await discord.utils.maybe_coroutine(handler().autocomplete, ctx, value) # type: ignore
-            elif isinstance(handler, _AutocompleteProtocol):
+            elif isinstance(handler, AutocompleteConverter):
                 result = await discord.utils.maybe_coroutine(handler.autocomplete, ctx, value)
             else:
-                result = await discord.utils.maybe_coroutine(handler, ctx, value) # type: ignore
-            data =  {"choices": [{"name": str(option), "value": option} for option in result]}
+                result = await discord.utils.maybe_coroutine(handler, self, ctx, value) # type: ignore
+            data = {"choices": [{"name": str(option), "value": option} for option in result]}
             await interaction.response.send_autocomplete_result(data) # type: ignore
             return
 

@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
     RngT = TypeVar("RngT", bound="Range")
 
-__all__ = ['describe', 'slash_command', 'message_command', 'user_command', 'Range', 'Command', 'SlashCommand', 'ContextMenuCommand', 'UserCommand', 'MessageCommand', 'autocomplete']
+__all__ = ['describe', 'slash_command', 'message_command', 'user_command', 'Range', 'Command', 'SlashCommand', 'ContextMenuCommand', 'UserCommand', 'MessageCommand', 'AutocompleteConverter']
 def _parse_resolved_data(interaction: discord.Interaction, data, state: discord.state.ConnectionState):
     if not data:
         return {}
@@ -114,22 +114,6 @@ def describe(**kwargs):
         return cmd
     return _inner
 
-def autocomplete(name: str, func_or_class: Union[Callable[[CtxT, str], list[float|int|str]], Callable[[CtxT, str], Awaitable[list[float|int|str]]], _AutocompleteProtocol]):
-    """
-    Set autocomplete handlers for specified parameters of the slash command.
-    """
-    def _inner(cmd):
-        func = cmd.func if isinstance(cmd, SlashCommand) else cmd
-        if inspect.isclass(func_or_class) and not issubclass(func_or_class, _AutocompleteProtocol):
-            raise TypeError(f"{func_or_class} is not a valid autocomplete handler. It must implement the convert and autocomplete method.")
-        try:
-            func._autocomplete_handlers_[name] = func_or_class
-        except AttributeError:
-            func._autocomplete_handlers_ = {name: func_or_class}
-        return cmd
-    return _inner
-
-
 def slash_command(**kwargs) -> Callable[[CmdT], SlashCommand]:
     """
     Defines a function as a slash-type application command.
@@ -203,10 +187,10 @@ class Range(metaclass=_RangeMeta):
         self.max = max
         
 @runtime_checkable
-class _AutocompleteProtocol(Protocol):
-    async def autocomplete(self, ctx, arg) -> Any: ...
+class AutocompleteConverter(Protocol):
+    async def autocomplete(self, ctx: Context, arg: str) -> list[int] | list[str] | list[float]: ...
 
-    async def convert(self, ctx, arg) -> Any: ...
+    async def convert(self, ctx: Context, arg: str) -> Any: ...
 
 
 class Command(Generic[CogT]):
@@ -238,6 +222,16 @@ class SlashCommand(Command[CogT]):
         self.parameters = self._build_parameters()
         self._parameter_descriptions: dict[str, str] = defaultdict(lambda: "No description provided")
 
+    def autocomplete_for(self, name):
+        def _inner(cmd):
+            if name not in self.parameters:
+                raise TypeError(f"{name} is not a parameter for command {self.name}")
+            try:
+                self.func._autocomplete_handlers_[name] = cmd
+            except AttributeError:
+                self.func._autocomplete_handlers_ = {name: cmd}
+        return _inner
+
     async def _build_arguments(self, ctx, interaction, state):
         if 'options' not in interaction.data:
             return {}
@@ -253,12 +247,12 @@ class SlashCommand(Command[CogT]):
                 result[option['name']] = value
                 continue
             converter = self.func._autocomplete_handlers_.get(option['name'])
-            if inspect.isclass(converter) and issubclass(converter, _AutocompleteProtocol): 
+            if inspect.isclass(converter) and issubclass(converter, AutocompleteConverter):
                 if inspect.ismethod(converter.convert): 
                     result[option['name']] = await discord.utils.maybe_coroutine(converter.convert, ctx, value)
                 else:
                     result[option['name']] = await discord.utils.maybe_coroutine(converter().convert, ctx, value) # type: ignore
-            elif isinstance(converter, _AutocompleteProtocol):
+            elif isinstance(converter, AutocompleteConverter):
                 result[option['name']] = await discord.utils.maybe_coroutine(converter.convert, ctx, value)
         return result
 
@@ -316,6 +310,8 @@ class SlashCommand(Command[CogT]):
                     real_t = type(ann.__args__[0])
                 elif hasattr(self.func, "_autocomplete_handlers_") and name in self.func._autocomplete_handlers_:
                     real_t = ann if ann in (int, str, float) else str
+                elif issubclass(ann, AutocompleteConverter):
+                    real_t = str
                 else:
                     real_t = ann
 
@@ -328,7 +324,7 @@ class SlashCommand(Command[CogT]):
                 if param.default is param.empty:
                     option['required'] = True
 
-                if hasattr(self.func, "_autocomplete_handlers_") and name in self.func._autocomplete_handlers_:
+                if hasattr(self.func, "_autocomplete_handlers_") and name in self.func._autocomplete_handlers_ or issubclass(ann, AutocompleteConverter):
                     option['autocomplete'] = True
                 
                 if isinstance(ann, Range):
@@ -346,8 +342,14 @@ class SlashCommand(Command[CogT]):
                         option['channel_types'] = filtered
 
                 elif get_origin(ann) is Literal:
-                    arguments = ann.__args__
+                    arguments = ann.__args__ # type: ignore
                     option['choices'] = [{'name': str(a), 'value': a} for a in arguments]
+
+                elif issubclass(ann, AutocompleteConverter):
+                    try:
+                        self.func._autocomplete_handlers_[name] = ann
+                    except AttributeError:
+                        self.func._autocomplete_handlers_ = {name: ann}
 
                 elif issubclass(ann, discord.abc.GuildChannel):
                     option['channel_types'] = [channel_filter[ann]]

@@ -28,7 +28,7 @@ async def command_error_wrapper(func: Callable[WrapperPS, Awaitable[Any]], *args
     except Exception as e:
         raise commands.CommandInvokeError(e) from e
 
-class Bot(commands.Bot):
+class Bot(commands.AutoShardedBot):
     application_id: int  # hack to avoid linting errors on http methods
 
     def __init__(self, *args, **kwargs):

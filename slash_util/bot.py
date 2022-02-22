@@ -39,10 +39,10 @@ class Bot(commands.Bot):
     async def _internal_interaction_handler(self, interaction: discord.Interaction):
         if interaction.type.value == 5:  # MODAL_SUBMIT
             if not hasattr(self._connection, '_modals'):
-                self.bot._connection._modals = {}  # type: ignore
+                self._connection._modals = {}  # type: ignore
 
             custom_id = interaction.data['custom_id']  # type: ignore
-            modal: Modal | None = self.bot._connection._modals.pop(custom_id, None)  # type: ignore
+            modal: Modal | None = self._connection._modals.pop(custom_id, None)  # type: ignore
             if modal is not None:
                 modal._response.set_result(interaction)
             return
